@@ -28,7 +28,8 @@
       "type": "none"
     },
     "KEYCODE_I": {
-      "type": "none"
+      "type": "keycode",
+      "keycode": "DPAD_UP"
     },
     "KEYCODE_O": {
       "type": "none"
@@ -60,13 +61,16 @@
       "keycode": "PAGE_DOWN"
     },
     "KEYCODE_J": {
-      "type": "none"
+      "type": "keycode",
+      "keycode": "DPAD_LEFT"
     },
     "KEYCODE_K": {
-      "type": "none"
+      "type": "keycode",
+      "keycode": "DPAD_DOWN"
     },
     "KEYCODE_L": {
-      "type": "none"
+      "type": "keycode",
+      "keycode": "DPAD_RIGHT"
     },
     "KEYCODE_Z": {
       "type": "action",

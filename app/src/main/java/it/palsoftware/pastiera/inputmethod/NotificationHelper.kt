@@ -4,10 +4,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 
 /**
  * Helper per gestire le notifiche dell'app.
@@ -58,6 +64,45 @@ object NotificationHelper {
     }
     
     /**
+     * Crea un'icona bitmap con la lettera "N" per la notifica del nav mode.
+     * @param size Dimensione dell'icona in pixel
+     * @param backgroundColor Colore di sfondo (default trasparente)
+     * @param textColor Colore del testo (default bianco)
+     */
+    private fun createNavModeIcon(
+        size: Int,
+        backgroundColor: Int = Color.TRANSPARENT,
+        textColor: Int = Color.WHITE
+    ): Bitmap {
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        
+        // Disegna lo sfondo
+        if (backgroundColor != Color.TRANSPARENT) {
+            canvas.drawColor(backgroundColor)
+        } else {
+            canvas.drawColor(Color.TRANSPARENT)
+        }
+        
+        // Disegna la lettera "N"
+        val paint = Paint().apply {
+            color = textColor
+            textSize = size * 0.7f // 70% della dimensione per avere margini
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+        
+        // Calcola la posizione verticale per centrare il testo
+        val textY = (canvas.height / 2) - ((paint.descent() + paint.ascent()) / 2)
+        
+        // Disegna la "N"
+        canvas.drawText("N", canvas.width / 2f, textY, paint)
+        
+        return bitmap
+    }
+    
+    /**
      * Mostra una notifica per l'attivazione del nav mode.
      * Verifica prima se il permesso è concesso.
      */
@@ -75,10 +120,21 @@ object NotificationHelper {
             createNotificationChannel(context)
         }
         
+        // Crea l'icona personalizzata con "N" per la small icon (barra di stato)
+        // Dimensioni standard per small icon: 24dp convertiti in pixel
+        val smallIconSize = (24 * context.resources.displayMetrics.density).toInt().coerceAtLeast(24)
+        val smallIconBitmap = createNavModeIcon(smallIconSize, Color.TRANSPARENT, Color.WHITE)
+        val smallIcon = IconCompat.createWithBitmap(smallIconBitmap)
+        
+        // Crea l'icona grande per la notifica espansa
+        val largeIconSize = (64 * context.resources.displayMetrics.density).toInt().coerceAtLeast(64)
+        val largeIconBitmap = createNavModeIcon(largeIconSize, Color.TRANSPARENT, Color.WHITE)
+        
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("Nav Mode Activated")
             .setContentText("Nav mode activated")
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Icona di sistema
+            .setSmallIcon(smallIcon) // Icona personalizzata con "N" per la barra di stato
+            .setLargeIcon(largeIconBitmap) // Icona grande con "N" per la notifica espansa
             .setPriority(NotificationCompat.PRIORITY_HIGH) // Priorità alta per visibilità migliore
             .setAutoCancel(true) // Si chiude automaticamente quando viene toccata
             .setOngoing(true) // Persistente per rimanere visibile
