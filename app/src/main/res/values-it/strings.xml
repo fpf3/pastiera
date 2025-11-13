@@ -21,6 +21,9 @@
     <string name="double_space_to_period_title">Doppio Spazio per Punto</string>
     <string name="double_space_to_period_description">Doppio tap su spazio per inserire un punto seguito da spazio e capitalizzare la lettera successiva.</string>
     
+    <!-- Swipe to Delete Section -->
+    <string name="swipe_to_delete_title">Abilita Swipe per Cancellare</string>
+    
     <!-- Info Section -->
     <string name="info_title">Informazioni</string>
     <string name="info_description">Le impostazioni vengono salvate automaticamente e applicate immediatamente all\'input method.</string>

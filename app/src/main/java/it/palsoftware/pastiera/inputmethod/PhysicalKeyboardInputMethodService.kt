@@ -319,6 +319,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                             inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, dpadKeyCode))
                             inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, dpadKeyCode))
                             Log.d(TAG, "Nav mode: inviato keycode $dpadKeyCode tramite inputConnection.sendKeyEvent (stesso metodo usato in campo di testo)")
+                            
+                            // Aggiorna le variazioni dopo il movimento del cursore
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                updateStatusBarText()
+                            }, 50) // 50ms per dare tempo ad Android di aggiornare la posizione del cursore
+                            
                             return true
                         } else {
                             Log.w(TAG, "Nav mode: nessun inputConnection disponibile per inviare keycode $dpadKeyCode")
@@ -342,6 +348,35 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         if (inputConnection == null) {
             deactivateVariations()
             return
+        }
+        
+        // Verifica se c'è una selezione attiva (più di una lettera selezionata)
+        // Se c'è una selezione, disattiva completamente le variazioni
+        try {
+            val extractedText = inputConnection.getExtractedText(
+                android.view.inputmethod.ExtractedTextRequest().apply {
+                    flags = android.view.inputmethod.ExtractedText.FLAG_SELECTING
+                },
+                0
+            )
+            
+            if (extractedText != null) {
+                val selectionStart = extractedText.selectionStart
+                val selectionEnd = extractedText.selectionEnd
+                
+                // Se c'è una selezione attiva (selectionStart != selectionEnd), disattiva le variazioni
+                if (selectionStart >= 0 && selectionEnd >= 0 && selectionStart != selectionEnd) {
+                    // C'è una selezione attiva, disattiva le variazioni
+                    variationsActive = false
+                    lastInsertedChar = null
+                    availableVariations = emptyList()
+                    Log.d(TAG, "Selezione attiva rilevata (start: $selectionStart, end: $selectionEnd), variazioni disattivate")
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            // Se c'è un errore nel controllo della selezione, continua con la logica normale
+            Log.d(TAG, "Errore nel controllo della selezione: ${e.message}")
         }
         
         // Ottieni il carattere prima del cursore
@@ -1122,10 +1157,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             return true
         }
         
-        // Gestisci il keycode 322 per cancellare l'ultima parola
+        // Gestisci il keycode 322 per cancellare l'ultima parola (swipe to delete)
         if (keyCode == 322) {
-            if (TextSelectionHelper.deleteLastWord(inputConnection)) {
-                // Consumiamo l'evento
+            val swipeToDeleteEnabled = SettingsManager.getSwipeToDelete(this)
+            if (swipeToDeleteEnabled) {
+                if (TextSelectionHelper.deleteLastWord(inputConnection)) {
+                    // Consumiamo l'evento
+                    return true
+                }
+            } else {
+                // Funzione disabilitata, consumiamo comunque l'evento per evitare comportamenti indesiderati
+                Log.d(TAG, "Swipe to delete disabilitato, evento keycode 322 ignorato")
                 return true
             }
         }
@@ -1234,6 +1276,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                             )
                             inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, mappedKeyCode))
                             inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, mappedKeyCode))
+                            
+                            // Aggiorna le variazioni dopo il movimento del cursore o altre operazioni
+                            // Usa un post con delay per assicurarsi che Android abbia completato l'operazione
+                            if (mappedKeyCode in listOf(
+                                KeyEvent.KEYCODE_DPAD_UP,
+                                KeyEvent.KEYCODE_DPAD_DOWN,
+                                KeyEvent.KEYCODE_DPAD_LEFT,
+                                KeyEvent.KEYCODE_DPAD_RIGHT,
+                                KeyEvent.KEYCODE_PAGE_UP,
+                                KeyEvent.KEYCODE_PAGE_DOWN
+                            )) {
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    updateStatusBarText()
+                                }, 50) // 50ms per dare tempo ad Android di aggiornare la posizione del cursore
+                            }
+                            
                             return true
                         } else {
                             // Keycode non riconosciuto, consuma l'evento per evitare inserimento carattere
@@ -1338,8 +1396,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 Log.d(TAG, "Shift one-shot, carattere modificato: $char")
                 shiftOneShot = false
                 inputConnection.commitText(char, 1)
-                // Aggiorna le variazioni dopo l'inserimento
-                updateStatusBarText()
+                // Aggiorna le variazioni dopo l'inserimento (con delay per assicurarsi che commitText sia completato)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateStatusBarText()
+                }, 30) // 30ms per dare tempo ad Android di completare commitText
                 return true
             }
         }
@@ -1355,8 +1415,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 if (altChar != null) {
                     Log.d(TAG, "Campo numerico: inserimento diretto carattere Alt '$altChar' per keyCode $keyCode")
                     inputConnection.commitText(altChar, 1)
-                    // Aggiorna le variazioni dopo l'inserimento
-                    updateStatusBarText()
+                    // Aggiorna le variazioni dopo l'inserimento (con delay per assicurarsi che commitText sia completato)
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        updateStatusBarText()
+                    }, 30) // 30ms per dare tempo ad Android di completare commitText
                     return true
                 }
             }
@@ -1388,8 +1450,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             
             if (shouldConsume) {
                 inputConnection.commitText(char, 1)
-                // Aggiorna le variazioni dopo l'inserimento
-                updateStatusBarText()
+                // Aggiorna le variazioni dopo l'inserimento (con delay per assicurarsi che commitText sia completato)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateStatusBarText()
+                }, 30) // 30ms per dare tempo ad Android di completare commitText
                 return true
             }
         }
@@ -1402,8 +1466,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             if (variationsMap.containsKey(char)) {
                 // Inserisci il carattere noi stessi per poter visualizzare le variazioni
                 inputConnection.commitText(char.toString(), 1)
-                // Aggiorna le variazioni dopo l'inserimento
-                updateStatusBarText()
+                // Aggiorna le variazioni dopo l'inserimento (con delay per assicurarsi che commitText sia completato)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateStatusBarText()
+                }, 30) // 30ms per dare tempo ad Android di completare commitText
                 return true
             }
             // Se il carattere non ha variazioni, le variazioni precedenti rimangono visibili
@@ -1416,10 +1482,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Aggiorna le variazioni dopo qualsiasi operazione che potrebbe cambiare il testo o la posizione del cursore
         // (caratteri inseriti, Backspace, frecce, ecc.)
         if (result) {
-            // Usa un post per aggiornare le variazioni dopo che Android ha gestito l'evento
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
+            // Usa un post con delay per assicurarsi che Android abbia completato tutte le modifiche
+            // Questo include inserimenti di caratteri, movimenti del cursore, backspace, ecc.
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 updateStatusBarText()
-            }
+            }, 30) // 30ms per dare tempo ad Android di completare le modifiche
         }
         return result
     }

@@ -18,6 +18,7 @@ object SettingsManager {
     private const val KEY_LONG_PRESS_THRESHOLD = "long_press_threshold"
     private const val KEY_AUTO_CAPITALIZE_FIRST_LETTER = "auto_capitalize_first_letter"
     private const val KEY_DOUBLE_SPACE_TO_PERIOD = "double_space_to_period"
+    private const val KEY_SWIPE_TO_DELETE = "swipe_to_delete"
     private const val KEY_SYM_MAPPINGS_CUSTOM = "sym_mappings_custom"
     private const val KEY_AUTO_CORRECT_ENABLED = "auto_correct_enabled"
     private const val KEY_AUTO_CORRECT_ENABLED_LANGUAGES = "auto_correct_enabled_languages"
@@ -28,6 +29,7 @@ object SettingsManager {
     private const val MAX_LONG_PRESS_THRESHOLD = 1000L
     private const val DEFAULT_AUTO_CAPITALIZE_FIRST_LETTER = false
     private const val DEFAULT_DOUBLE_SPACE_TO_PERIOD = false
+    private const val DEFAULT_SWIPE_TO_DELETE = true
     private const val DEFAULT_AUTO_CORRECT_ENABLED = true
     
     /**
@@ -99,6 +101,22 @@ object SettingsManager {
     fun setDoubleSpaceToPeriod(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_DOUBLE_SPACE_TO_PERIOD, enabled)
+            .apply()
+    }
+    
+    /**
+     * Ottiene lo stato dello swipe per cancellare (keycode 322).
+     */
+    fun getSwipeToDelete(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SWIPE_TO_DELETE, DEFAULT_SWIPE_TO_DELETE)
+    }
+    
+    /**
+     * Imposta lo stato dello swipe per cancellare (keycode 322).
+     */
+    fun setSwipeToDelete(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SWIPE_TO_DELETE, enabled)
             .apply()
     }
     

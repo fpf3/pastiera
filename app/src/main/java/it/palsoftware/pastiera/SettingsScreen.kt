@@ -57,6 +57,11 @@ fun SettingsScreen(
         mutableStateOf(SettingsManager.getDoubleSpaceToPeriod(context))
     }
     
+    // Carica il valore salvato dello swipe per cancellare
+    var swipeToDelete by remember {
+        mutableStateOf(SettingsManager.getSwipeToDelete(context))
+    }
+    
     // Carica il valore salvato dell'auto-correzione
     var autoCorrectEnabled by remember {
         mutableStateOf(SettingsManager.getAutoCorrectEnabled(context))
@@ -282,6 +287,41 @@ fun SettingsScreen(
                         onCheckedChange = { enabled ->
                             doubleSpaceToPeriod = enabled
                             SettingsManager.setDoubleSpaceToPeriod(context, enabled)
+                        }
+                    )
+                }
+            }
+            
+            HorizontalDivider()
+            
+            // Swipe to Delete
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TextFields,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.swipe_to_delete_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Switch(
+                        checked = swipeToDelete,
+                        onCheckedChange = { enabled ->
+                            swipeToDelete = enabled
+                            SettingsManager.setSwipeToDelete(context, enabled)
                         }
                     )
                 }
