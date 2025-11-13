@@ -8,6 +8,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
+import it.palsoftware.pastiera.SettingsManager
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -177,7 +178,24 @@ class AltSymManager(
             insertedNormalChars[keyCode] = normalChar
         }
 
-        scheduleLongPress(keyCode, inputConnection)
+        // Check if this key should support long press
+        val useShift = context?.let { 
+            SettingsManager.isLongPressShift(it) 
+        } ?: false
+        
+        // Only schedule long press if:
+        // - Using Alt and key has Alt mapping, OR
+        // - Using Shift and character is a letter
+        val shouldScheduleLongPress = if (useShift) {
+            normalChar.isNotEmpty() && normalChar[0].isLetter()
+        } else {
+            altKeyMap.containsKey(keyCode)
+        }
+        
+        if (shouldScheduleLongPress) {
+            scheduleLongPress(keyCode, inputConnection)
+        }
+        
         return true
     }
 
@@ -219,26 +237,53 @@ class AltSymManager(
         inputConnection: InputConnection
     ) {
         reloadLongPressThreshold()
+        
+        // Check if we should use Shift or Alt
+        val useShift = context?.let { 
+            SettingsManager.isLongPressShift(it) 
+        } ?: false
 
         val runnable = Runnable {
             if (pressedKeys.containsKey(keyCode)) {
-                val altChar = altKeyMap[keyCode]
                 val insertedChar = insertedNormalChars[keyCode]
-
-                if (altChar != null) {
-                    longPressActivated[keyCode] = true
-
-                    if (insertedChar != null && insertedChar.isNotEmpty()) {
+                
+                if (useShift) {
+                    // Long press with Shift: make the character uppercase
+                    if (insertedChar != null && insertedChar.isNotEmpty() && insertedChar[0].isLetter()) {
+                        longPressActivated[keyCode] = true
+                        val upperChar = insertedChar.uppercase()
+                        
+                        // Delete the lowercase character and insert uppercase
                         inputConnection.deleteSurroundingText(1, 0)
+                        inputConnection.commitText(upperChar, 1)
+                        
+                        insertedNormalChars.remove(keyCode)
+                        longPressRunnables.remove(keyCode)
+                        Log.d(TAG, "Long press Shift per keyCode $keyCode -> $upperChar")
+                        // Notify that a character was inserted
+                        if (upperChar.isNotEmpty()) {
+                            onAltCharInserted?.invoke(upperChar[0])
+                        }
                     }
-
-                    inputConnection.commitText(altChar, 1)
-                    insertedNormalChars.remove(keyCode)
-                    longPressRunnables.remove(keyCode)
-                    Log.d(TAG, "Long press Alt per keyCode $keyCode -> $altChar")
-                    // Notifica che un carattere Alt è stato inserito
-                    if (altChar.isNotEmpty()) {
-                        onAltCharInserted?.invoke(altChar[0])
+                } else {
+                    // Long press with Alt: use existing Alt mapping
+                    val altChar = altKeyMap[keyCode]
+                    
+                    if (altChar != null) {
+                        longPressActivated[keyCode] = true
+                        
+                        if (insertedChar != null && insertedChar.isNotEmpty()) {
+                            inputConnection.deleteSurroundingText(1, 0)
+                        }
+                        
+                        inputConnection.commitText(altChar, 1)
+                        insertedNormalChars.remove(keyCode)
+                        longPressRunnables.remove(keyCode)
+                        Log.d(TAG, "Long press Alt per keyCode $keyCode -> $altChar")
+                        // Notify that an Alt character was inserted
+                        if (altChar.isNotEmpty()) {
+                            onAltCharInserted?.invoke(altChar[0])
+                        }
                     }
                 }
             }

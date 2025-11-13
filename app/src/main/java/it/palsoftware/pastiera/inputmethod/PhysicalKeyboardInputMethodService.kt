@@ -17,6 +17,8 @@ import it.palsoftware.pastiera.inputmethod.KeyboardEventTracker
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 
 /**
  * Input method service specialized for physical keyboards.
@@ -95,9 +97,115 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     
     // Flag to avoid infinite loops when reactivating the keyboard recursively
     private var isRehandlingKeyAfterReactivation = false
+    
+    // Cache for launcher packages
+    private var cachedLauncherPackages: Set<String>? = null
+    
+    // Current package name
+    private var currentPackageName: String? = null
 
     private fun refreshStatusBar() {
         updateStatusBarText()
+    }
+    
+    /**
+     * Verifica se il package corrente è un launcher.
+     */
+    private fun isLauncher(packageName: String?): Boolean {
+        if (packageName == null) return false
+        
+        // Cache la lista dei launcher per evitare query ripetute
+        if (cachedLauncherPackages == null) {
+            try {
+                val pm = packageManager
+                val intent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                }
+                
+                val resolveInfos: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
+                cachedLauncherPackages = resolveInfos.map { it.activityInfo.packageName }.toSet()
+                Log.d(TAG, "Launcher packages trovati: $cachedLauncherPackages")
+            } catch (e: Exception) {
+                Log.e(TAG, "Errore nel rilevamento dei launcher", e)
+                cachedLauncherPackages = emptySet()
+            }
+        }
+        
+        val isLauncher = cachedLauncherPackages?.contains(packageName) ?: false
+        Log.d(TAG, "isLauncher($packageName) = $isLauncher")
+        return isLauncher
+    }
+    
+    /**
+     * Apre un'app tramite package name.
+     */
+    private fun launchApp(packageName: String): Boolean {
+        try {
+            val pm = packageManager
+            val intent = pm.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                Log.d(TAG, "App aperta: $packageName")
+                return true
+            } else {
+                Log.w(TAG, "Nessun launch intent trovato per: $packageName")
+                return false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Errore nell'apertura dell'app $packageName", e)
+            return false
+        }
+    }
+    
+    /**
+     * Gestisce le scorciatoie del launcher quando non siamo in un campo di testo.
+     */
+    private fun handleLauncherShortcut(keyCode: Int): Boolean {
+        val shortcut = SettingsManager.getLauncherShortcut(this, keyCode)
+        if (shortcut != null) {
+            // Gestisci diversi tipi di azioni
+            when (shortcut.type) {
+                SettingsManager.LauncherShortcut.TYPE_APP -> {
+                    if (shortcut.packageName != null) {
+                        val success = launchApp(shortcut.packageName)
+                        if (success) {
+                            Log.d(TAG, "Scorciatoia launcher eseguita: tasto $keyCode -> ${shortcut.packageName}")
+                            return true // Consumiamo l'evento
+                        }
+                    }
+                }
+                SettingsManager.LauncherShortcut.TYPE_SHORTCUT -> {
+                    // TODO: Gestire scorciatoie in futuro
+                    Log.d(TAG, "Tipo scorciatoia non ancora implementato: ${shortcut.type}")
+                }
+                else -> {
+                    Log.d(TAG, "Tipo azione sconosciuto: ${shortcut.type}")
+                }
+            }
+        } else {
+            // Tasto non assegnato: mostra dialog per assegnare un'app
+            showLauncherShortcutAssignmentDialog(keyCode)
+            return true // Consumiamo l'evento per evitare che venga gestito altrove
+        }
+        return false // Non consumiamo l'evento
+    }
+    
+    /**
+     * Mostra il dialog per assegnare un'app a un tasto.
+     */
+    private fun showLauncherShortcutAssignmentDialog(keyCode: Int) {
+        try {
+            val intent = Intent(this, LauncherShortcutAssignmentActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra(LauncherShortcutAssignmentActivity.EXTRA_KEY_CODE, keyCode)
+            }
+            startActivity(intent)
+            Log.d(TAG, "Dialog assegnazione mostrato per tasto $keyCode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Errore nel mostrare il dialog di assegnazione", e)
+        }
     }
 
     override fun onCreate() {
@@ -543,6 +651,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
     override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
         super.onStartInput(info, restarting)
+        
+        // Traccia il package corrente
+        currentPackageName = info?.packageName
         Log.d(TAG, "onStartInput() called - restarting: $restarting, info: ${info?.packageName}, inputType: ${info?.inputType}, ctrlLatchActive: $ctrlLatchActive")
         
         // Check whether the field is actually editable
@@ -826,6 +937,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // and also other keys when Ctrl latch is active (nav mode active).
         // When re-handling events after reactivation, skip this check.
         if (!isInputViewActive && !isRehandlingKeyAfterReactivation) {
+            // Gestisci le scorciatoie del launcher quando non siamo in un campo di testo
+            // MA: bypassa questa logica se siamo in nav mode (ctrlLatchActive) o se le scorciatoie sono disabilitate
+            if (!ctrlLatchActive && SettingsManager.getLauncherShortcutsEnabled(this)) {
+                val packageName = currentInputEditorInfo?.packageName ?: currentPackageName
+                if (isLauncher(packageName)) {
+                    // Siamo nel launcher e non in un campo di testo - controlla se c'è una scorciatoia
+                    if (handleLauncherShortcut(keyCode)) {
+                        return true // Scorciatoia eseguita, consumiamo l'evento
+                    }
+                }
+            }
+            
             // Check if we have a valid InputConnection (we are on a text field)
             // but the keyboard is hidden (for example after pressing Back)
             val inputConnection = currentInputConnection
@@ -1590,12 +1713,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             }
         }
         
-        // Check whether this key has an Alt mapping.
+        // Check whether this key has an Alt mapping or should support long press with Shift.
         // If it does, handle it with long press (even when shiftOneShot is active).
         // This avoids inserting the normal character when the user intends a long press.
-        if (altSymManager.hasAltMapping(keyCode)) {
-            // In numeric fields, insert the Alt character directly
-            if (isNumericField) {
+        val useShift = SettingsManager.isLongPressShift(this)
+        val hasLongPressSupport = if (useShift) {
+            // With Shift, support long press for any letter key
+            event != null && event.unicodeChar != 0 && event.unicodeChar.toChar().isLetter()
+        } else {
+            // With Alt, only keys with Alt mapping
+            altSymManager.hasAltMapping(keyCode)
+        }
+        
+        if (hasLongPressSupport) {
+            // In numeric fields, only insert Alt character directly if using Alt modifier
+            // (Shift modifier doesn't make sense for numeric fields)
+            if (isNumericField && !useShift) {
                 val altChar = altSymManager.getAltMappings()[keyCode]
                 if (altChar != null) {
                     Log.d(TAG, "Numeric field: direct insertion of Alt character '$altChar' for keyCode $keyCode")

@@ -24,6 +24,7 @@ object SettingsManager {
     private const val KEY_SYM_MAPPINGS_PAGE2_CUSTOM = "sym_mappings_page2_custom"
     private const val KEY_AUTO_CORRECT_ENABLED = "auto_correct_enabled"
     private const val KEY_AUTO_CORRECT_ENABLED_LANGUAGES = "auto_correct_enabled_languages"
+    private const val KEY_LONG_PRESS_MODIFIER = "long_press_modifier" // "alt" or "shift"
     
     // Default values
     private const val DEFAULT_LONG_PRESS_THRESHOLD = 500L
@@ -34,6 +35,7 @@ object SettingsManager {
     private const val DEFAULT_SWIPE_TO_DELETE = true
     private const val DEFAULT_AUTO_SHOW_KEYBOARD = true
     private const val DEFAULT_AUTO_CORRECT_ENABLED = true
+    private const val DEFAULT_LONG_PRESS_MODIFIER = "alt"
     
     /**
      * Returns the SharedPreferences instance for Pastiera.
@@ -509,6 +511,158 @@ object SettingsManager {
         } catch (e: Exception) {
             Log.e(TAG, "Error updating language name for $languageCode", e)
         }
+    }
+    
+    /**
+     * Returns the long-press modifier type ("alt" or "shift").
+     */
+    fun getLongPressModifier(context: Context): String {
+        return getPreferences(context).getString(KEY_LONG_PRESS_MODIFIER, DEFAULT_LONG_PRESS_MODIFIER) ?: DEFAULT_LONG_PRESS_MODIFIER
+    }
+    
+    /**
+     * Sets the long-press modifier type ("alt" or "shift").
+     */
+    fun setLongPressModifier(context: Context, modifier: String) {
+        val validModifier = if (modifier == "shift") "shift" else "alt"
+        getPreferences(context).edit()
+            .putString(KEY_LONG_PRESS_MODIFIER, validModifier)
+            .apply()
+    }
+    
+    /**
+     * Returns true if long press uses Shift, false if it uses Alt.
+     */
+    fun isLongPressShift(context: Context): Boolean {
+        return getLongPressModifier(context) == "shift"
+    }
+    
+    /**
+     * Data class per rappresentare una scorciatoia del launcher.
+     * Estendibile per supportare diversi tipi di azioni in futuro (app, shortcut, ecc.)
+     */
+    data class LauncherShortcut(
+        val type: String = TYPE_APP, // Tipo di azione: "app", "shortcut", ecc.
+        val packageName: String? = null, // Per tipo "app"
+        val appName: String? = null, // Per tipo "app"
+        val action: String? = null, // Per tipo "shortcut" o altri tipi futuri
+        val data: String? = null // Dati aggiuntivi per tipi futuri
+    ) {
+        companion object {
+            const val TYPE_APP = "app"
+            const val TYPE_SHORTCUT = "shortcut"
+            // Aggiungi altri tipi in futuro qui
+        }
+    }
+    
+    private const val KEY_LAUNCHER_SHORTCUTS = "launcher_shortcuts"
+    private const val KEY_LAUNCHER_SHORTCUTS_ENABLED = "launcher_shortcuts_enabled"
+    private const val DEFAULT_LAUNCHER_SHORTCUTS_ENABLED = true
+    
+    /**
+     * Imposta una scorciatoia del launcher per un tasto (tipo app).
+     */
+    fun setLauncherShortcut(context: Context, keyCode: Int, packageName: String, appName: String) {
+        setLauncherAction(context, keyCode, LauncherShortcut(
+            type = LauncherShortcut.TYPE_APP,
+            packageName = packageName,
+            appName = appName
+        ))
+    }
+    
+    /**
+     * Imposta un'azione del launcher per un tasto (generico, estendibile).
+     */
+    fun setLauncherAction(context: Context, keyCode: Int, action: LauncherShortcut) {
+        val prefs = getPreferences(context)
+        val shortcutsJson = prefs.getString(KEY_LAUNCHER_SHORTCUTS, "{}") ?: "{}"
+        
+        try {
+            val shortcuts = JSONObject(shortcutsJson)
+            shortcuts.put(keyCode.toString(), JSONObject().apply {
+                put("type", action.type)
+                if (action.packageName != null) put("packageName", action.packageName)
+                if (action.appName != null) put("appName", action.appName)
+                if (action.action != null) put("action", action.action)
+                if (action.data != null) put("data", action.data)
+            })
+            prefs.edit().putString(KEY_LAUNCHER_SHORTCUTS, shortcuts.toString()).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Errore nel salvataggio dell'azione per tasto $keyCode", e)
+        }
+    }
+    
+    /**
+     * Rimuove una scorciatoia del launcher per un tasto.
+     */
+    fun removeLauncherShortcut(context: Context, keyCode: Int) {
+        val prefs = getPreferences(context)
+        val shortcutsJson = prefs.getString(KEY_LAUNCHER_SHORTCUTS, "{}") ?: "{}"
+        
+        try {
+            val shortcuts = JSONObject(shortcutsJson)
+            shortcuts.remove(keyCode.toString())
+            prefs.edit().putString(KEY_LAUNCHER_SHORTCUTS, shortcuts.toString()).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Errore nella rimozione della scorciatoia per tasto $keyCode", e)
+        }
+    }
+    
+    /**
+     * Ottiene tutte le scorciatoie del launcher salvate.
+     */
+    fun getLauncherShortcuts(context: Context): Map<Int, LauncherShortcut> {
+        val prefs = getPreferences(context)
+        val shortcutsJson = prefs.getString(KEY_LAUNCHER_SHORTCUTS, "{}") ?: "{}"
+        val shortcuts = mutableMapOf<Int, LauncherShortcut>()
+        
+        try {
+            val json = JSONObject(shortcutsJson)
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val keyCode = key.toIntOrNull()
+                if (keyCode != null) {
+                    val shortcutObj = json.getJSONObject(key)
+                    val type = shortcutObj.optString("type", LauncherShortcut.TYPE_APP)
+                    
+                    shortcuts[keyCode] = LauncherShortcut(
+                        type = type,
+                        packageName = shortcutObj.optString("packageName").takeIf { it.isNotEmpty() },
+                        appName = shortcutObj.optString("appName").takeIf { it.isNotEmpty() },
+                        action = shortcutObj.optString("action").takeIf { it.isNotEmpty() },
+                        data = shortcutObj.optString("data").takeIf { it.isNotEmpty() }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Errore nel caricamento delle scorciatoie", e)
+        }
+        
+        return shortcuts
+    }
+    
+    /**
+     * Ottiene una scorciatoia del launcher per un tasto specifico.
+     */
+    fun getLauncherShortcut(context: Context, keyCode: Int): LauncherShortcut? {
+        return getLauncherShortcuts(context)[keyCode]
+    }
+    
+    /**
+     * Restituisce se le scorciatoie del launcher sono abilitate.
+     */
+    fun getLauncherShortcutsEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_LAUNCHER_SHORTCUTS_ENABLED, DEFAULT_LAUNCHER_SHORTCUTS_ENABLED)
+    }
+    
+    /**
+     * Imposta se le scorciatoie del launcher sono abilitate.
+     */
+    fun setLauncherShortcutsEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_LAUNCHER_SHORTCUTS_ENABLED, enabled)
+            .apply()
     }
 }
 

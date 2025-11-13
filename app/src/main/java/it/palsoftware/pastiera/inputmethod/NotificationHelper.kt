@@ -42,23 +42,32 @@ object NotificationHelper {
     
     /**
      * Creates the notification channel (required on Android 8.0+).
-     * Uses IMPORTANCE_LOW for a silent notification without sound or vibration.
+     * Uses IMPORTANCE_DEFAULT for normal priority notification.
+     * Deletes and recreates the channel if it already exists to apply new settings.
      */
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // Delete existing channel if it exists to recreate with new settings
+            try {
+                notificationManager.deleteNotificationChannel(CHANNEL_ID)
+            } catch (e: Exception) {
+                // Channel doesn't exist, that's fine
+            }
+            
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW // Silent notification (no sound/vibration)
+                NotificationManager.IMPORTANCE_DEFAULT // Normal priority notification
             ).apply {
                 description = "Notifications for Pastiera nav mode"
                 setShowBadge(false)
-                enableLights(false) // Disable LED light for silent notification
+                enableLights(false) // Disable LED light
                 enableVibration(false) // No vibration
                 setSound(null, null) // No sound
             }
             
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
@@ -135,12 +144,12 @@ object NotificationHelper {
             .setContentText("Nav mode activated")
             .setSmallIcon(smallIcon) // Custom "N" icon for status bar
             .setLargeIcon(largeIconBitmap) // Large "N" icon for expanded notification
-            .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority for silent notification
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT) // Normal priority notification
             .setAutoCancel(true) // Automatically dismissed when tapped
             .setOngoing(true) // Persistent, stays visible
             .setCategory(NotificationCompat.CATEGORY_STATUS) // Status category for status bar
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Visible on lock screen
-            .setSilent(true) // Silent notification (no sound)
+            // Sound is disabled via channel settings (setSound(null, null))
             .build()
         
         notificationManager.notify(NOTIFICATION_ID, notification)

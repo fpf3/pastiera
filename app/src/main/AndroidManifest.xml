@@ -8,6 +8,20 @@
     <!-- Permesso per il riconoscimento vocale -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Query per vedere tutte le app installate che possono essere avviate -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        
+        <!-- Query per vedere i launcher -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -46,6 +60,14 @@
         <!-- Attività helper per il riconoscimento vocale -->
         <activity
             android:name=".inputmethod.SpeechRecognitionActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask" />
+        
+        <!-- Attività per assegnare scorciatoie del launcher -->
+        <activity
+            android:name=".inputmethod.LauncherShortcutAssignmentActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:exported="false"
             android:excludeFromRecents="true"

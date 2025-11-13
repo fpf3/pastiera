@@ -47,6 +47,11 @@ fun SettingsScreen(
         mutableStateOf(SettingsManager.getLongPressThreshold(context))
     }
     
+    // Load saved long press modifier value
+    var longPressModifier by remember { 
+        mutableStateOf(SettingsManager.getLongPressModifier(context))
+    }
+    
     // Load saved auto-capitalize value
     var autoCapitalizeFirstLetter by remember {
         mutableStateOf(SettingsManager.getAutoCapitalizeFirstLetter(context))
@@ -72,9 +77,17 @@ fun SettingsScreen(
         mutableStateOf(SettingsManager.getAutoCorrectEnabled(context))
     }
     
+    // Load saved launcher shortcuts enabled value
+    var launcherShortcutsEnabled by remember {
+        mutableStateOf(SettingsManager.getLauncherShortcutsEnabled(context))
+    }
+    
     // State for navigation to auto-correction settings
     var showAutoCorrectSettings by remember { mutableStateOf(false) }
     var showAutoCorrectEdit by remember { mutableStateOf<String?>(null) }
+    
+    // State for navigation to launcher shortcuts settings
+    var showLauncherShortcuts by remember { mutableStateOf(false) }
     
     // Handle system back button
     BackHandler {
@@ -84,6 +97,9 @@ fun SettingsScreen(
             }
             showAutoCorrectSettings -> {
                 showAutoCorrectSettings = false
+            }
+            showLauncherShortcuts -> {
+                showLauncherShortcuts = false
             }
             else -> {
                 onBack()
@@ -108,6 +124,14 @@ fun SettingsScreen(
             onEditLanguage = { languageCode ->
                 showAutoCorrectEdit = languageCode
             }
+        )
+        return
+    }
+    
+    if (showLauncherShortcuts) {
+        LauncherShortcutsScreen(
+            modifier = modifier,
+            onBack = { showLauncherShortcuts = false }
         )
         return
     }
@@ -217,6 +241,68 @@ fun SettingsScreen(
                             text = "${SettingsManager.getMaxLongPressThreshold()}ms",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            HorizontalDivider()
+            
+            // Long Press Modifier (Alt/Shift)
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Keyboard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.long_press_modifier_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = stringResource(R.string.long_press_modifier_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.long_press_modifier_alt),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (longPressModifier == "alt") 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Switch(
+                            checked = longPressModifier == "shift",
+                            onCheckedChange = { useShift ->
+                                val newModifier = if (useShift) "shift" else "alt"
+                                longPressModifier = newModifier
+                                SettingsManager.setLongPressModifier(context, newModifier)
+                            }
+                        )
+                        Text(
+                            text = stringResource(R.string.long_press_modifier_shift),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (longPressModifier == "shift") 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -475,6 +561,88 @@ fun SettingsScreen(
             }
             
             HorizontalDivider()
+            
+            // Launcher Shortcuts Enabled Toggle
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Keyboard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Scorciatoie Launcher",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Abilita le scorciatoie da tastiera nel launcher",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = launcherShortcutsEnabled,
+                        onCheckedChange = { enabled ->
+                            launcherShortcutsEnabled = enabled
+                            SettingsManager.setLauncherShortcutsEnabled(context, enabled)
+                        }
+                    )
+                }
+            }
+            
+            HorizontalDivider()
+            
+            // Launcher Shortcuts Settings (only if enabled)
+            if (launcherShortcutsEnabled) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLauncherShortcuts = true }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Keyboard,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Configura scorciatoie",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Assegna tasti per aprire app nel launcher",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                HorizontalDivider()
+            }
             
             // About section
             Surface(

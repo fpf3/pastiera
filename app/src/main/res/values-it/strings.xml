@@ -74,5 +74,11 @@
     <string name="reset_to_default">Ripristina Predefiniti</string>
     <string name="select_emoji">Seleziona Emoji</string>
     <string name="close">Chiudi</string>
+    
+    <!-- Long Press Modifier Section -->
+    <string name="long_press_modifier_title">Modificatore Long Press</string>
+    <string name="long_press_modifier_description">Scegli se il long press simula Alt+tasto o Shift+tasto</string>
+    <string name="long_press_modifier_alt">Alt</string>
+    <string name="long_press_modifier_shift">Shift</string>
 </resources>
 

@@ -124,6 +124,12 @@
     <string name="modifier_shift">SHIFT</string>
     <string name="modifier_ctrl">CTRL</string>
     
+    <!-- Long Press Modifier Section -->
+    <string name="long_press_modifier_title">Long Press Modifier</string>
+    <string name="long_press_modifier_description">Choose whether long press simulates Alt+key or Shift+key</string>
+    <string name="long_press_modifier_alt">Alt</string>
+    <string name="long_press_modifier_shift">Shift</string>
+    
     <!-- About Section -->
     <string name="about_github">GitHub</string>
     <string name="about_build_info">Build</string>
